@@ -1,7 +1,7 @@
 from os import urandom
 from tqdm import tqdm
 
-bin_file = open('numbers_small.bin', 'ab')
+bin_file = open('numbers.bin', 'ab')
 
 num_bytes = 2 * 1024 ** 3
 word_length = 1024

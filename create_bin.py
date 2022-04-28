@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 bin_file = open('numbers_small.bin', 'ab')
 
-num_bytes = 2 * 1024 * 1024
+num_bytes = 2 * 1024 ** 3
 word_length = 1024
 
 for i in tqdm(range(num_bytes // word_length)):

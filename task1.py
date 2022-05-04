@@ -1,20 +1,22 @@
+from multiprocessing import Process, Manager
 import os
 import time
 import mmap
-from concurrent.futures import ThreadPoolExecutor
 import math
+import numpy as np
 
 
-def calc_sum(descriptor):
+def calc_sum_process(mmap_params, return_list, idx):
     uint32_size = 4
-    sum = 0
+    s = 0
 
-    bytes = descriptor.read(uint32_size)
-    while bytes:
-        sum += int.from_bytes(bytes, byteorder='big', signed=False)
+    with mmap.mmap(**mmap_params) as descriptor:
         bytes = descriptor.read(uint32_size)
+        while bytes:
+            s += int.from_bytes(bytes, byteorder='big', signed=False)
+            bytes = descriptor.read(uint32_size)
 
-    return sum
+    return_list[idx] = s
 
 
 def mmap_file_parts(descriptor, max_workers):
@@ -31,22 +33,37 @@ def mmap_file_parts(descriptor, max_workers):
         else:
             length = bytes_total - offset
 
-        yield mmap.mmap(descriptor.fileno(), length=length, offset=offset, access=mmap.ACCESS_READ)
-    
-
-def st_sum(filename):
-    with open(filename, 'rb') as f:
-        return calc_sum(f)
+        yield i, {'fileno': descriptor.fileno(), 'length': length, 'offset': offset, 'access': mmap.ACCESS_READ}
 
 
 def mt_sum(filename):
-    sum = 0
-    with ThreadPoolExecutor() as executor:
-        with open(filename, 'rb') as f:
-            for result in executor.map(calc_sum, mmap_file_parts(f, max_workers=executor._max_workers)):
-                    sum+=result
-        
-    return sum
+    num_workers = 8
+
+    pool = []
+    manager = Manager()
+    result = manager.dict()
+    with open(filename, 'rb') as f:
+        for i, mmap_param in mmap_file_parts(f, 8):
+            p = Process(target=calc_sum_process, args=(mmap_param, result, i))
+            pool.append(p)
+            pool[-1].start()
+
+        for process in pool:
+            process.join()
+    
+    return sum(result.values())
+    
+
+def st_sum(filename):
+    uint32_size = 4
+    s = 0
+    with open(filename, 'rb') as f:
+        bytes = f.read(uint32_size)
+        while bytes:
+            s += int.from_bytes(bytes, byteorder='big', signed=False)
+            bytes = f.read(uint32_size)
+
+    return s
 
 
 def measure(label, func):
@@ -62,8 +79,8 @@ def measure(label, func):
 if __name__ == '__main__':
     filename = 'numbers.bin'
 
-    st_result, st_time = measure('st sum', lambda: st_sum(filename))
     mt_result, mt_time = measure('mm mt sum', lambda: mt_sum(filename))
+    st_result, st_time = measure('st sum', lambda: st_sum(filename))
     
     print('Results are the same: %s' % (st_result == mt_result))
     print('acceleration: %f times' % (st_time / mt_time))

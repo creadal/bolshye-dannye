@@ -13,7 +13,7 @@ if __name__ == '__main__':
     num_threads = 4
 
     numbers = []
-    with open('task2\\numbers.txt', 'r') as file:
+    with open('C:\\Users\\user\\Desktop\\bolshye dannye\\task2\\numbers.txt', 'r') as file:
         numbers = file.readlines()
 
     slices = [numbers[i*2000//num_threads:(i+1)*2000//num_threads] for i in range(num_threads)]
